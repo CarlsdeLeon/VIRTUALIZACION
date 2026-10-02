@@ -21,6 +21,7 @@ Verificar el servicio:
 ```bash
 kubectl get svc
 ```
+![1790906855397](image/README/1790906855397.png)
 
 ### Acceso mediante Minikube
 
@@ -29,6 +30,7 @@ Para acceder al servicio:
 ```bash
 minikube service nginx-service --url
 ```
+![1790906724659](image/README/1790906724659.png)
 
 El comando proporciona una URL local para acceder al servidor Nginx desde el navegador.
 
