@@ -107,8 +107,8 @@ make verify
 
 | | |
 |---|---|
-| ![app1](screenshots/app1.png) | ![app2](screenshots/app2.png) |
-| ![app3](screenshots/app3.png) | ![app4](screenshots/app4.png) |
+| ![app1](![1791058963247](image/README/1791058963247.png)) | ![app2](![1791059158760](image/README/1791059158760.png)) |
+| ![app3](![1791059178304](image/README/1791059178304.png)) | ![app4](![1791059205404](image/README/1791059205404.png)) |
 
 ## Acceso desde Windows (opcional)
 
