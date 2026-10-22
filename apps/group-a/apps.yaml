@@ -1,0 +1,143 @@
+# ---------- APP 1: whoami ----------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app1-whoami
+  namespace: parcial-celc
+  labels:
+    app.kubernetes.io/name: app1
+    app.kubernetes.io/part-of: parcial-02
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: app1
+  template:
+    metadata:
+      labels:
+        app: app1
+        app.kubernetes.io/name: app1
+    spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: whoami
+          image: traefik/whoami:v1.10.3
+          ports:
+            - name: http
+              containerPort: 80
+          securityContext:
+            allowPrivilegeEscalation: false
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app1-svc
+  namespace: parcial-celc
+  labels:
+    app.kubernetes.io/name: app1
+spec:
+  type: ClusterIP
+  selector:
+    app: app1
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+# ---------- APP 2: nginx hello ----------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app2-hello
+  namespace: parcial-celc
+  labels:
+    app.kubernetes.io/name: app2
+    app.kubernetes.io/part-of: parcial-02
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: app2
+  template:
+    metadata:
+      labels:
+        app: app2
+        app.kubernetes.io/name: app2
+    spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: hello
+          image: nginxdemos/hello:plain-text
+          ports:
+            - name: http
+              containerPort: 80
+          securityContext:
+            allowPrivilegeEscalation: false
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app2-svc
+  namespace: parcial-celc
+  labels:
+    app.kubernetes.io/name: app2
+spec:
+  type: ClusterIP
+  selector:
+    app: app2
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

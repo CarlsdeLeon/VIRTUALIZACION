@@ -1,9 +1,10 @@
-NS_APPS ?= parcial-celc
+NS_APPS ?= argocd-celc
 IP ?= 192.168.49.240
 
 .PHONY: all metallb traefik apps route hosts bridge verify clean
 
-all: metallb traefik apps route hosts verify
+
+all: metallb traefik route argocd gitops hosts verify
 
 metallb:
 	kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.14.9/config/manifests/metallb-native.yaml
@@ -25,6 +26,17 @@ apps:
 
 route:
 	sudo ip route replace $(IP)/32 via $$(minikube ip)
+
+argocd:
+	helm repo add argo https://argoproj.github.io/argo-helm
+	helm repo update
+	helm upgrade --install argocd argo/argo-cd -n argocd-celc --create-namespace -f argocd/values.yaml --wait
+	kubectl apply -f argocd/ingress.yaml
+
+gitops:
+	kubectl apply -f argocd/applications/
+	sleep 20
+	kubectl -n $(NS_ARGO) get applications
 
 hosts:
 	./scripts/hosts.sh $(IP)

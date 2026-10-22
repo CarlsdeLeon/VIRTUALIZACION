@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: apps-group-b
+  namespace: argocd-celc
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/<usuario>/<repo>.git
+    targetRevision: assessment-06
+    path: apps/group-b
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: parcial-celc
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
