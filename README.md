@@ -92,6 +92,41 @@ kubectl -n argocd-celc get secret argocd-initial-admin-secret -o jsonpath='{.dat
 
 **Nota WSL2.** Desde WSL no se recibía respuesta ARP de MetalLB, por lo que la regla `route` agrega una ruta hacia la IP del LoadBalancer a través del nodo de Minikube. Se pierde al reiniciar WSL; basta con ejecutar `make route`.
 
+**Instalación de Argo CD** (regla `make argocd`):
+
+```bash
+helm repo add argo https://argoproj.github.io/argo-helm
+helm upgrade --install argocd argo/argo-cd -n argocd-celc --create-namespace -f argocd/values.yaml --wait
+kubectl apply -f argocd/ingress.yaml
+```
+
+**Definición de la Application** (`argocd/applications/apps-group-a.yaml`):
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: apps-group-a
+  namespace: argocd-celc
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/CarlsdeLeon/VIRTUALIZACION.git
+    targetRevision: assessment-06
+    path: apps/group-a
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: parcial-celc
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+```
+
+`apps-group-b.yaml` es igual, con `path: apps/group-b`.
+
 ## Verificación
 
 ```bash
@@ -101,9 +136,7 @@ kubectl -n parcial-celc get deploy,svc,ingress
 make verify
 ```
 
-```
-(pegar aquí la salida: Applications en Synced/Healthy y verify con 200)
-```
+![1792647842564](image/README/1792647842564.png)
 
 ### Argo CD por nombre de dominio
 
@@ -125,9 +158,7 @@ git push
 
 Argo CD detectó el cambio en el repositorio (con **Refresh** o en su siguiente revisión) y lo sincronizó automáticamente, sin ejecutar `kubectl apply`.
 
-```
-![1792647069385](image/README/1792647069385.png)
-```
+![1792647815288](image/README/1792647815288.png)
 
 ### Application después del cambio (Synced y Healthy)
 
