@@ -1,118 +1,141 @@
-# Evaluación Parcial II: Kubernetes, Traefik y MetalLB
+# Evaluación Parcial: Argo CD y GitOps
 
-Cuatro aplicaciones web expuestas por **una única IP** (`192.168.49.240`) en un clúster local de **Minikube**. **MetalLB** asigna la IP del LoadBalancer, **Traefik** actúa como Ingress Controller y enruta por nombre de dominio. Toda la infraestructura está definida como código (YAML, values de Helm y Makefile).
+Instalación de **Argo CD** en Minikube, expuesto mediante **Traefik** con un nombre de dominio, y despliegue de las 4 aplicaciones del namespace `parcial-celc` desde este repositorio siguiendo el enfoque **GitOps**. Toda la configuración está definida como código (YAML, values de Helm y Makefile).
 
-- **Rama:** `assessment-02`
+- **Rama:** `assessment-06`
+- **Namespace de Argo CD:** `argocd-celc`
 - **Namespace de las apps:** `parcial-celc`
-- **Dominios:** `app1.parcial.local` ... `app4.parcial.local`
+- **Dominios:** `argocd.parcial.local`, `app1.parcial.local` ... `app4.parcial.local`
 
 ## Arquitectura
 
 ```
-Navegador ──► /etc/hosts ──► 192.168.49.240 (IP de MetalLB)
-                                   │
-                    Service traefik (LoadBalancer, ns: traefik)
-                                   │
-                         Traefik (enruta por Host)
-                                   │
-                  Ingress apps-ingress (ns: parcial-celc)
-                                   │
-                  appN-svc ──► Deployment appN (2 réplicas)
+GitHub (rama assessment-06)
+        │  Argo CD sincroniza (apps/group-a, apps/group-b)
+        ▼
+Argo CD (ns: argocd-celc) ───────► Clúster: ns parcial-celc (4 apps)
+
+Navegador ─► /etc/hosts ─► 192.168.49.240 (MetalLB) ─► Traefik ─► Ingress ─► Service ─► Pod
+                                                          ├── argocd.parcial.local ─► argocd-server
+                                                          └── appN.parcial.local   ─► appN-svc
 ```
 
 ## Estructura del IaC
 
 ```
 .
-├── Makefile                        # punto de entrada del despliegue
-├── metallb/metallb-config.yaml     # IPAddressPool + L2Advertisement
-├── traefik/values.yaml             # Helm values (Service LoadBalancer)
-├── apps/apps.yaml                  # Namespace, 4 Deployments, 4 Services, Ingress
-├── scripts/hosts.sh                # DNS local en /etc/hosts
-├── bridge/docker-compose.yaml      # opcional: acceso desde Windows
+├── Makefile                          # punto de entrada del despliegue
+├── metallb/metallb-config.yaml       # pool de una sola IP
+├── traefik/values.yaml               # Service LoadBalancer
+├── argocd/
+│   ├── values.yaml                   # Helm values de Argo CD
+│   ├── ingress.yaml                  # exposición por Traefik
+│   └── applications/
+│       ├── apps-group-a.yaml         # Application: app1 y app2
+│       └── apps-group-b.yaml         # Application: app3 y app4
+├── apps/
+│   ├── group-a/                      # Deployments, Services e Ingress de app1 y app2
+│   └── group-b/                      # Deployments, Services e Ingress de app3 y app4
+├── scripts/hosts.sh                  # DNS local en /etc/hosts
+├── bridge/docker-compose.yaml        # opcional: acceso desde Windows
 └── screenshots/
 ```
 
 | Requisito | Dónde se cumple |
 |---|---|
-| MetalLB en su propio namespace, con una sola IP | `metallb-system` · `metallb/metallb-config.yaml` |
-| Traefik en su propio namespace, Service `LoadBalancer` con la IP de MetalLB | `traefik` · `traefik/values.yaml` |
-| 4 Deployments y 4 Services en `parcial-celc` | `apps/apps.yaml` |
-| Services gestionados por Traefik | `Ingress` con `ingressClassName: traefik` en `apps/apps.yaml` |
-| 4 dominios apuntando a la IP del LoadBalancer | `scripts/hosts.sh` |
-
-## Requisitos
-
-Entorno usado: Windows + WSL2 (Ubuntu 24.04), Docker Engine, Minikube con driver `docker`, `kubectl` y `helm`.
-
-> Completar versiones: `minikube version`, `kubectl version --client`, `helm version`.
+| Argo CD en el namespace `argocd-celc` | `make argocd` · `argocd/values.yaml` |
+| Argo CD expuesto por Traefik con dominio | `argocd/ingress.yaml` · `scripts/hosts.sh` |
+| Conexión al repositorio y a la rama | `repoURL` y `targetRevision: assessment-06` en `argocd/applications/` |
+| Al menos dos Application | `apps-group-a.yaml` y `apps-group-b.yaml` |
+| Cambio en el repo sincronizado | Sección "Cambio en el repositorio" |
 
 ## Despliegue
 
+Los manifiestos deben estar en GitHub antes de crear las Application, porque Argo CD los lee desde el repositorio.
+
 ```bash
+git push -u origin assessment-06
 minikube start
 make
 ```
 
-`make` ejecuta en orden:
-
 | Regla | Qué hace |
 |---|---|
-| `metallb` | Instala MetalLB v0.14.9 y aplica el pool de una sola IP |
-| `traefik` | Instala Traefik con Helm usando `traefik/values.yaml` |
-| `apps` | Despliega las 4 aplicaciones, sus Services y el Ingress |
+| `metallb` | Instala MetalLB y aplica el pool de una sola IP |
+| `traefik` | Instala Traefik con Helm (Service `LoadBalancer`) |
 | `route` | Ruta local hacia la IP de MetalLB (ver nota WSL) |
-| `hosts` | Agrega los 4 dominios a `/etc/hosts` |
-| `verify` | Comprueba que los 4 dominios respondan `200` |
+| `argocd` | Instala Argo CD con Helm y aplica su Ingress |
+| `gitops` | Aplica las Application; Argo CD despliega las apps |
+| `hosts` | Agrega los dominios a `/etc/hosts` |
+| `verify` | Comprueba que cada dominio responda `200` |
 
 ## Configuración
 
-**MetalLB.** El `IPAddressPool` contiene una única IP, `192.168.49.240`, dentro de la subred de Minikube, anunciada mediante `L2Advertisement`.
+**Argo CD.** Se instala con el chart oficial de Helm en el namespace `argocd-celc`. `server.insecure: true` en `argocd/values.yaml` hace que `argocd-server` hable HTTP, ya que Traefik termina el tráfico en HTTP y, sin esto, Argo CD redirigiría a HTTPS en bucle.
 
-**Traefik.** El Service es de tipo `LoadBalancer` y solicita la IP de MetalLB con la anotación `metallb.io/loadBalancerIPs`.
+**Exposición.** `argocd/ingress.yaml` define un Ingress con `ingressClassName: traefik` y el host `argocd.parcial.local`, que apunta al Service `argocd-server`. `/etc/hosts` resuelve ese dominio a `192.168.49.240`, la IP del LoadBalancer de Traefik asignada por MetalLB.
 
-**Aplicaciones.** Cada una tiene 2 réplicas, probes de readiness y liveness, límites de recursos y un Service `ClusterIP`.
+**Application.** Hay dos, ambas con sincronización automática (`prune` y `selfHeal`) y `CreateNamespace=true`:
 
-| App | Imagen | Service | Dominio |
-|---|---|---|---|
-| app1 | `traefik/whoami` | `app1-svc` | `app1.parcial.local` |
-| app2 | `nginxdemos/hello` | `app2-svc` | `app2.parcial.local` |
-| app3 | `httpd:2.4` | `app3-svc` | `app3.parcial.local` |
-| app4 | `hashicorp/http-echo` | `app4-svc` | `app4.parcial.local` |
+| Application | Ruta en el repo | Contenido |
+|---|---|---|
+| `apps-group-a` | `apps/group-a` | app1 (`whoami`), app2 (`hello`) |
+| `apps-group-b` | `apps/group-b` | app3 (`httpd`), app4 (`http-echo`) |
 
-**DNS local.** `scripts/hosts.sh` agrega, de forma idempotente, estas entradas a `/etc/hosts`:
+Ambas despliegan en el namespace `parcial-celc` del clúster local.
 
-```
-192.168.49.240 app1.parcial.local
-192.168.49.240 app2.parcial.local
-192.168.49.240 app3.parcial.local
-192.168.49.240 app4.parcial.local
+**Acceso.** Usuario `admin`. La contraseña inicial se obtiene con:
+
+```bash
+kubectl -n argocd-celc get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d; echo
 ```
 
-**Nota WSL2.** Desde WSL no se recibía respuesta ARP de MetalLB, por lo que la regla `route` agrega una ruta hacia la IP del LoadBalancer a través del nodo de Minikube. La ruta se pierde al reiniciar WSL; basta con ejecutar `make route` de nuevo.
+**Nota WSL2.** Desde WSL no se recibía respuesta ARP de MetalLB, por lo que la regla `route` agrega una ruta hacia la IP del LoadBalancer a través del nodo de Minikube. Se pierde al reiniciar WSL; basta con ejecutar `make route`.
 
 ## Verificación
 
 ```bash
-kubectl -n traefik get svc traefik
+kubectl -n argocd-celc get pods
+kubectl -n argocd-celc get applications
 kubectl -n parcial-celc get deploy,svc,ingress
 make verify
 ```
 
+```
+(pegar aquí la salida: Applications en Synced/Healthy y verify con 200)
+```
 
-![image0](image/README/1791058816594.png)
+### Argo CD por nombre de dominio
 
+![1792646479427](image/README/1792646479427.png)
 
-### Capturas
+### Application antes del cambio (Synced y Healthy)
 
-| | |
-|---|---|
-| ![app1](image/README/1791058963247.png) | ![app2](image/README/1791059158760.png) |
-| ![app3](image/README/1791059178304.png) | ![app4](image/README/1791059205404.png) |
+![1792646763048](image/README/1792646763048.png)
+
+## Cambio en el repositorio
+
+Para comprobar el flujo GitOps se modificó el número de réplicas de `app1-whoami` en `apps/group-a/apps.yaml`, de `2` a `3`:
+
+```bash
+git add apps/group-a/apps.yaml
+git commit -m "app1: replicas de 2 a 3"
+git push
+```
+
+Argo CD detectó el cambio en el repositorio (con **Refresh** o en su siguiente revisión) y lo sincronizó automáticamente, sin ejecutar `kubectl apply`.
+
+```
+![1792647069385](image/README/1792647069385.png)
+```
+
+### Application después del cambio (Synced y Healthy)
+
+![1792646898549](image/README/1792646898549.png)
 
 ## Acceso desde Windows (opcional)
 
-Windows no ve la red de Minikube, que existe solo dentro de WSL. Para abrir las apps en el navegador de Windows, `make bridge` levanta un contenedor `socat` que reenvía `localhost:80` a la IP de MetalLB, y el archivo hosts de Windows apunta los 4 dominios a `127.0.0.1`. El tráfico sigue pasando por MetalLB y Traefik. Este paso solo sirve para visualizar las apps; la configuración evaluada es la de `/etc/hosts` en WSL.
+Windows no ve la red de Minikube. `make bridge` levanta un contenedor `socat` que reenvía `localhost:80` a la IP de MetalLB, y el archivo hosts de Windows apunta los dominios (incluido `argocd.parcial.local`) a `127.0.0.1`. El tráfico sigue pasando por MetalLB y Traefik. Solo sirve para visualizar; lo evaluado es `/etc/hosts` en WSL.
 
 ## Limpieza
 

@@ -6,7 +6,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/<usuario>/<repo>.git
+    repoURL: https://github.com/CarlsdeLeon/VIRTUALIZACION.git
     targetRevision: assessment-06
     path: apps/group-a
   destination:

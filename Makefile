@@ -1,8 +1,7 @@
 NS_APPS ?= argocd-celc
 IP ?= 192.168.49.240
 
-.PHONY: all metallb traefik apps route hosts bridge verify clean
-
+.PHONY: all metallb traefik route argocd gitops hosts bridge verify clean
 
 all: metallb traefik route argocd gitops hosts verify
 
