@@ -8,7 +8,6 @@ metadata:
     app.kubernetes.io/name: app1
     app.kubernetes.io/part-of: parcial-02
 spec:
-  replicas: 2
   strategy:
     type: RollingUpdate
     rollingUpdate:
