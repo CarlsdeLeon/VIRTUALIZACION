@@ -1,0 +1,16 @@
+# Chart: prometheus-community/prometheus  (release: prometheus)
+# Incluye Prometheus server, kube-state-metrics y node-exporter.
+alertmanager:
+  enabled: false
+prometheus-pushgateway:
+  enabled: false
+kube-state-metrics:
+  enabled: true
+prometheus-node-exporter:
+  enabled: true
+server:
+  retention: 6h
+  global:
+    scrape_interval: 15s
+  persistentVolume:
+    enabled: false

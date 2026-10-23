@@ -5,3 +5,6 @@ service:
 ingressClass:
   enabled: true
   isDefaultClass: true
+logs:
+  access:
+    enabled: true

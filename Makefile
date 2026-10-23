@@ -1,9 +1,24 @@
-NS_APPS ?= argocd-celc
+NS_ARGO ?= argocd-celc
+NS_MON ?= monitoring-celc
+GRAFANA_PASSWORD ?= admin-celc
 IP ?= 192.168.49.240
 
-.PHONY: all metallb traefik route argocd gitops hosts bridge verify clean
+.PHONY: all observability metallb traefik route argocd gitops hosts bridge verify clean
 
-all: metallb traefik route argocd gitops hosts verify
+all: metallb traefik route argocd gitops observability hosts verify
+
+observability:
+	kubectl apply -f monitoring/namespace.yaml
+	helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+	helm repo update
+	helm upgrade --install prometheus prometheus-community/prometheus -n $(NS_MON) -f monitoring/prometheus/values.yaml --wait --timeout 5m
+	kubectl apply -f monitoring/loki/loki.yaml
+	kubectl apply -f monitoring/promtail/promtail.yaml
+	kubectl -n $(NS_MON) create secret generic grafana-admin --from-literal=admin-user=admin --from-literal=admin-password=$(GRAFANA_PASSWORD) --dry-run=client -o yaml | kubectl apply -f -
+	kubectl -n $(NS_MON) create configmap grafana-dashboards --from-file=monitoring/grafana/dashboards --dry-run=client -o yaml | kubectl apply -f -
+	kubectl apply -f monitoring/grafana/grafana.yaml
+	kubectl apply -f monitoring/ingress.yaml
+	kubectl -n $(NS_MON) rollout status deployment grafana --timeout=180s
 
 metallb:
 	kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.14.9/config/manifests/metallb-native.yaml
@@ -17,11 +32,6 @@ traefik:
 	helm repo update
 	helm upgrade --install traefik traefik/traefik -n traefik --create-namespace -f traefik/values.yaml --wait
 	kubectl -n traefik get svc traefik
-
-apps:
-	kubectl apply -f apps/apps.yaml
-	kubectl -n $(NS_APPS) wait --for=condition=available deployment --all --timeout=180s
-	kubectl -n $(NS_APPS) get deploy,svc,ingress
 
 route:
 	sudo ip route replace $(IP)/32 via $$(minikube ip)
@@ -44,7 +54,7 @@ bridge:
 	docker compose -f bridge/docker-compose.yaml up -d
 
 verify:
-	@for n in 1 2 3 4; do curl -s -o /dev/null -w "app$$n -> %{http_code}\n" http://app$$n.parcial.local; done
+	@for h in argocd app1 app2 app3 app4 grafana prometheus; do curl -sL -o /dev/null -w "$$h -> %{http_code}\n" http://$$h.parcial.local; done
 
 clean:
 	kubectl delete -f apps/apps.yaml --ignore-not-found
