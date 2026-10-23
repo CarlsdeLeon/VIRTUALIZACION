@@ -1,0 +1,146 @@
+# ---------- APP 3: httpd ----------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app3-httpd
+  namespace: parcial-celc
+  labels:
+    app.kubernetes.io/name: app3
+    app.kubernetes.io/part-of: parcial-02
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: app3
+  template:
+    metadata:
+      labels:
+        app: app3
+        app.kubernetes.io/name: app3
+    spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: httpd
+          image: httpd:2.4
+          ports:
+            - name: http
+              containerPort: 80
+          securityContext:
+            allowPrivilegeEscalation: false
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app3-svc
+  namespace: parcial-celc
+  labels:
+    app.kubernetes.io/name: app3
+spec:
+  type: ClusterIP
+  selector:
+    app: app3
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+# ---------- APP 4: http-echo ----------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app4-echo
+  namespace: parcial-celc
+  labels:
+    app.kubernetes.io/name: app4
+    app.kubernetes.io/part-of: parcial-02
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: app4
+  template:
+    metadata:
+      labels:
+        app: app4
+        app.kubernetes.io/name: app4
+    spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: echo
+          image: hashicorp/http-echo:1.0
+          args:
+            - "-listen=:5678"
+            - "-text=Hola desde la app 4 - parcial-celc"
+          ports:
+            - name: http
+              containerPort: 5678
+          securityContext:
+            allowPrivilegeEscalation: false
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app4-svc
+  namespace: parcial-celc
+  labels:
+    app.kubernetes.io/name: app4
+spec:
+  type: ClusterIP
+  selector:
+    app: app4
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

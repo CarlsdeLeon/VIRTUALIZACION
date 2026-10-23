@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: apps-group-a
+  namespace: argocd-celc
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/CarlsdeLeon/VIRTUALIZACION.git
+    targetRevision: assessment-06
+    path: apps/group-a
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: parcial-celc
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

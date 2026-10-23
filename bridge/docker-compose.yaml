@@ -1,0 +1,7 @@
+services:
+  metallb-bridge:
+    image: alpine/socat
+    container_name: metallb-bridge
+    network_mode: host
+    restart: unless-stopped
+    command: TCP-LISTEN:80,fork,reuseaddr TCP:192.168.49.240:80
