@@ -69,7 +69,12 @@ Después `make hosts` agrega `grafana.parcial.local` y `prometheus.parcial.local
 
 **Prometheus.** Chart oficial de `prometheus-community` con Alertmanager y Pushgateway desactivados. Incluye `kube-state-metrics` (estado de pods) y `node-exporter` (CPU y memoria del nodo), y sus scrape configs por defecto recolectan kubelet, cAdvisor, el API server y los endpoints anotados. Sin volumen persistente y con retención de 6 horas, por ser un entorno local.
 
-**Loki.** Un único Deployment en modo monolítico con almacenamiento en filesystem (TSDB, esquema v13) y retención de 24 horas. Se despliega con manifiestos propios porque el chart de Loki cambió de repositorio y de numeración en 2026. Los datos están en un `emptyDir`: se pierden si el pod se reinicia, lo cual es aceptable en este entorno.
+```bash
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm upgrade --install prometheus prometheus-community/prometheus -n monitoring-celc -f monitoring/prometheus/values.yaml
+```
+
+**Loki.** Un único Deployment en modo monolítico con almacenamiento en filesystem (TSDB, esquema v13). Se despliega con manifiestos propios porque el chart de Loki cambió de repositorio y de numeración en 2026. Los datos están en un `emptyDir`: se pierden si el pod se reinicia, lo cual es aceptable en este entorno.
 
 **Promtail.** DaemonSet que lee `/var/log/pods` del nodo (hostPath de solo lectura) y envía los logs a Loki. Cada aplicación (`app1` a `app4`) y Traefik tiene su propia ruta explícita en `static_configs`, con las etiquetas `namespace` y `app`, que se usan en los dashboards (por ejemplo `app="app1"`). El runtime del nodo es containerd, por lo que el pipeline usa el parser `cri`. Los access logs de Traefik se habilitan en `traefik/values.yaml` (`logs.access.enabled: true`).
 
@@ -90,6 +95,13 @@ Después `make hosts` agrega `grafana.parcial.local` y `prometheus.parcial.local
 
 **Exposición.** `monitoring/ingress.yaml` define un Ingress con `ingressClassName: traefik` y dos hosts: `grafana.parcial.local` hacia el Service `grafana` y `prometheus.parcial.local` hacia `prometheus-server`. Ambos se resuelven a la IP de MetalLB mediante `/etc/hosts`.
 
+**DNS local.** `scripts/hosts.sh` agrega a `/etc/hosts` los dominios nuevos, apuntando a la IP del LoadBalancer de Traefik:
+
+```
+192.168.49.240 grafana.parcial.local
+192.168.49.240 prometheus.parcial.local
+```
+
 ## Verificación
 
 ```bash
@@ -103,26 +115,29 @@ Para generar logs de las aplicaciones y de Traefik:
 for i in $(seq 1 30); do for n in 1 2 3 4; do curl -s -o /dev/null http://app$n.parcial.local; done; done
 ```
 
-![1792732235694](image/README/1792732235694.png)
+### Pods del stack y verificación
+
+![pods](image/README/1792732235694.png)
 
 ### Grafana y Prometheus por nombre de dominio
 
-![1792731061329](image/README/1792731061329.png)
+![grafana](image/README/1792731061329.png)
 
-![1792731334875](image/README/1792731334875.png)
+![prometheus](image/README/1792731334875.png)
 
 ### Prometheus: Targets en estado UP
 
-![1792731387757](image/README/1792731387757.png)
+![targets](image/README/1792731387757.png)
 
 ### Dashboard de métricas
 
-![1792731457805](image/README/1792731457805.png)
+![metricas](image/README/1792731457805.png)
 
 ### Dashboard de logs (4 aplicaciones)
 
-![1792731476133](image/README/1792731476133.png)
-![1792731491356](image/README/1792731491356.png)
+![logs-1](image/README/1792731476133.png)
+
+![logs-2](image/README/1792731491356.png)
 
 ## Acceso desde Windows (opcional)
 
